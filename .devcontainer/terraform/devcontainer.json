@@ -4,6 +4,10 @@
 	"name": "Terraform",
 	"dockerFile": "Dockerfile",
 
+	"mounts": [
+    "source=${localEnv:HOME}/.aws,target=/root/.aws,type=bind,consistency=cached"
+  ],
+
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
 		"ghcr.io/devcontainers/features/git:1": {
