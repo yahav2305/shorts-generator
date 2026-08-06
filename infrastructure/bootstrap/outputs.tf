@@ -9,7 +9,7 @@ output "backend_config_snippet" {
 terraform {
   backend "s3" {
     bucket         = "${aws_s3_bucket.tf_state_bucket.id}"
-    key            = "workloads/terraform.tfstate"
+    key            = "${var.environment}/terraform.tfstate"
     use_lockfile   = true
     region         = "${var.aws_region}"
     encrypt        = true

@@ -177,7 +177,7 @@ All configuration for this sits in ./infrastructure/bootstrap.
         ```sh
         AWS_PROFILE=dev terraform init -migrate-state \
             -backend-config="bucket=<dev-bucket-name>" \
-            -backend-config="key=terraform.tfstate" \
+            -backend-config="key=bootstrap/terraform.tfstate" \
             -backend-config="region=us-east-1" \
             -backend-config="use_lockfile=true" \
             -backend-config="encrypt=true"
@@ -191,7 +191,7 @@ All configuration for this sits in ./infrastructure/bootstrap.
         terraform {
             backend "s3" {
                 bucket         = "<dev-bucket-name>"
-                key            = "terraform.tfstate"
+                key            = "dev/terraform.tfstate"
                 use_lockfile   = true
                 region         = var.region
                 encrypt        = true
@@ -238,7 +238,7 @@ All configuration for this sits in ./infrastructure/bootstrap.
         # Env is shared-svcs since the full name is too long be an S3 bucket name
         AWS_PROFILE=shared-services terraform init -migrate-state \
             -backend-config="bucket=<shared-services-bucket-name>" \
-            -backend-config="key=terraform.tfstate" \
+            -backend-config="key=bootstrap/terraform.tfstate" \
             -backend-config="region=us-east-1" \
             -backend-config="use_lockfile=true" \
             -backend-config="encrypt=true"
@@ -252,7 +252,7 @@ All configuration for this sits in ./infrastructure/bootstrap.
         terraform {
             backend "s3" {
                 bucket         = "<shared-services-bucket-name>"
-                key            = "terraform.tfstate"
+                key            = "shared-svcs/terraform.tfstate"
                 use_lockfile   = true
                 region         = var.region
                 encrypt        = true
@@ -297,8 +297,8 @@ All configuration for this sits in ./infrastructure/bootstrap.
 
         ```sh
         AWS_PROFILE=prod terraform init -migrate-state \
-            -backend-config="bucket=<dev-bucket-name>" \
-            -backend-config="key=terraform.tfstate" \
+            -backend-config="bucket=<prod-bucket-name>" \
+            -backend-config="key=bootstrap/terraform.tfstate" \
             -backend-config="region=us-east-1" \
             -backend-config="use_lockfile=true" \
             -backend-config="encrypt=true"
@@ -312,7 +312,7 @@ All configuration for this sits in ./infrastructure/bootstrap.
         terraform {
             backend "s3" {
                 bucket         = "<prod-bucket-name>"
-                key            = "terraform.tfstate"
+                key            = "prod/terraform.tfstate"
                 use_lockfile   = true
                 region         = var.region
                 encrypt        = true
