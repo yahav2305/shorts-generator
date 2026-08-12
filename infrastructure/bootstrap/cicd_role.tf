@@ -126,12 +126,12 @@ data "aws_iam_policy_document" "cicd_scoped_permissions" {
     condition {
       test     = "StringNotEquals"
       variable = "iam:PermissionsBoundary"
-      values   = [aws_iam_policy.cicd_workload_boundary.arn]
+      values   = [aws_iam_policy.role_workload_boundary.arn]
     }
   }
 }
 
-data "aws_iam_policy_document" "cicd_workload_boundary" {
+data "aws_iam_policy_document" "role_workload_boundary" {
   statement {
     sid    = "AllowStandardWorkloads"
     effect = "Allow"
@@ -149,7 +149,7 @@ data "aws_iam_policy_document" "cicd_workload_boundary" {
   }
 
   statement {
-    sid    = "AllowIAMAndAccountAdmin"
+    sid    = "DenyIAMAndAccountAdmin"
     effect = "Deny"
     actions = [
       "iam:*",
@@ -165,10 +165,10 @@ resource "aws_iam_role" "cicd_deployer" {
   assume_role_policy = data.aws_iam_policy_document.cicd_assume_role.json
 }
 
-resource "aws_iam_policy" "cicd_workload_boundary" {
-  name        = "${var.environment}-cicd-workload-boundary-${var.github_org_name}-${var.github_repo_name}"
+resource "aws_iam_policy" "role_workload_boundary" {
+  name        = "${var.environment}-role-workload-boundary-${var.github_org_name}-${var.github_repo_name}"
   description = "Maximum permissions ceiling for workload roles created by the CI/CD deployer role"
-  policy      = data.aws_iam_policy_document.cicd_workload_boundary.json
+  policy      = data.aws_iam_policy_document.role_workload_boundary.json
 }
 
 resource "aws_iam_policy" "cicd_scoped_policy" {
