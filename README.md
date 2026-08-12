@@ -70,13 +70,13 @@ workloads-ou --> prod-account[Prod Account - No console access]
 - Management Account - The administrative parent of the entire AWS Organization.\
 Centralized billing, account creation, and Organization-wide policy enforcement via SCPs.\
 No application workloads, databases, or public endpoints.
-    - Infrastructure OU - Houses dedicated accounts for shared resources.
-        - Shared Services Account - Hosts resources that are shared between different workload accounts (E.g. ECR for docker images for both dev and prod).
-    - Workloads OU - Houses dedicated accounts for workloads.
-        - Dev Account - Account for developers. allows manual changes and rapid pipeline iterations.
-        - Prod Account - Live workloads.\
-        Locked down to automated deployment via pipelines.\
-        No console or manual access.
+  - Infrastructure OU - Houses dedicated accounts for shared resources.
+    - Shared Services Account - Hosts resources that are shared between different workload accounts (E.g. ECR for docker images for both dev and prod).
+  - Workloads OU - Houses dedicated accounts for workloads.
+    - Dev Account - Account for developers. allows manual changes and rapid pipeline iterations.
+    - Prod Account - Live workloads.\
+      Locked down to automated deployment via pipelines.\
+      No console or manual access.
 
 ## Signing in to AWS via CLI
 
@@ -126,12 +126,18 @@ Since we are using multiple AWS accounts, we must configure the AWS cli to use S
     aws ec2 describe-vpcs --profile dev
     ```
 
-## Bootstrapping resources
+## Bootstrapping Resources
 
-Running terraform requires an S3 bucket to store state and DynamoDB to store state locking. This means that we first have to create them before we are able to use terraform to create resources. This can be bypassed by running terraform locally to create the S3 bucket and the DynamoDB table, and then using them to save the state.\
-Of course each account has its own S3 bucket and DynamoDB table.
+We require a couple of AWS resources in order to run Terraform via CI/CD:
 
-All configuration for this sits in ./infrastructure/bootstrap.
+- an S3 bucket to store and lock state.
+- An AWS role with permissions for the the Github runner to assume.
+- An OIDC connection for the Github runner to get temporary credentials for the role.
+
+We first create the required AWS resources from an admin account by running Terraform locally, then migrate the local terraform state into the S3 bucket.\
+Each account has its own S3 bucket.
+
+All configuration for the bootstrapping sits in ./infrastructure/bootstrap.
 
 1. Change to the required directory:
 
@@ -145,65 +151,15 @@ All configuration for this sits in ./infrastructure/bootstrap.
     aws sso login --sso-session shorts-generator
     ```
 
-1. For the dev account:
+1. For each environment (dev, shared-services, or prod):
 
-    1. Initialize the directory:
-
-        ```sh
-        terraform init
-        ```
-
-    1. In `./infrastructure/bootstrap/providers.tf` ensure that the backend configuration is empty.
-
-    1. Create the bootstrap resource (an S3 bucket):
+    1. Ensure that no the local state files exist (`./infrastructure/bootstrap/terraform.tfstate` and `./infrastructure/bootstrap/terraform.tfstate.backup`). If they do, delete them:
 
         ```sh
-        AWS_PROFILE=dev terraform apply \
-            -var="environment=dev" \
-            -var="org_name=shorts-generator" \
-            -var="aws_region=us-east-1"
+        rm terraform.tfstate terraform.tfstate.backup
         ```
 
-        and make sure to note the bucket name in the output.
-
-    1. In `./infrastructure/bootstrap/providers.tf` add an empty S3 bucket backend:
-
-        ```hcl
-        backend "s3" {}
-        ```
-
-    1. Then migrate the state to the S3 bucket:
-
-        ```sh
-        AWS_PROFILE=dev terraform init -migrate-state \
-            -backend-config="bucket=<dev-bucket-name>" \
-            -backend-config="key=bootstrap/terraform.tfstate" \
-            -backend-config="region=us-east-1" \
-            -backend-config="use_lockfile=true" \
-            -backend-config="encrypt=true"
-        ```
-
-    1. After the migration, remove the empty S3 bucket backend in `./infrastructure/bootstrap/providers.tf` for the next run.
-    1. After the migration, delete the local state file (`./infrastructure/bootstrap/terraform.tfstate` and `./infrastructure/bootstrap/terraform.tfstate.backup`)
-    1. After the migration, add the following S3 backend configuration to the dev environment in `./infrastructure/environments/dev/providers.tf`:
-
-        ```hcl
-        terraform {
-            backend "s3" {
-                bucket         = "<dev-bucket-name>"
-                key            = "dev/terraform.tfstate"
-                use_lockfile   = true
-                region         = var.region
-                encrypt        = true
-            }
-        }
-        ```
-
-1. For the shared-services account:
-
-    1. In `./infrastructure/bootstrap/providers.tf` ensure that the backend configuration is empty.
-
-    1. Delete the current `.terraform` directory to clear the cache from the previous run:
+    1. If the directory `.terraform` exists, delete it in order to clear the cache from the previous run:
 
         ```sh
         rm -rf .terraform
@@ -215,18 +171,24 @@ All configuration for this sits in ./infrastructure/bootstrap.
         terraform init -reconfigure
         ```
 
-    1. Create the bootstrap resource (an S3 bucket):
+    1. In `providers.tf` ensure that the backend configuration is empty.
+
+    1. Create the bootstrap resource (for the shared-services environment use shared-svcs as the value of the `environment` variable):
 
         ```sh
-        AWS_PROFILE=shared-services terraform apply \
-            -var="environment=shared-svcs" \
+        AWS_PROFILE=<environment> terraform apply \
+            -var="environment=<environment>" \
             -var="org_name=shorts-generator" \
-            -var="aws_region=us-east-1"
+            -var="aws_region=us-east-1" \
+            -var="github_org=yahav2305" \
+            -var="github_repo=shorts-generator"
         ```
 
-        and make sure to note the bucket name in the output.
+        and make sure to note the output.
 
-    1. In `./infrastructure/bootstrap/providers.tf` add an empty S3 bucket backend:
+    1. Put the value of the CI/CD ARN role as a repository secret in github for the current environment under the name `AWS_<environment>_CICD_ROLE_ARN`.
+
+    1. In `providers.tf` add an empty S3 bucket backend:
 
         ```hcl
         backend "s3" {}
@@ -235,24 +197,21 @@ All configuration for this sits in ./infrastructure/bootstrap.
     1. Then migrate the state to the S3 bucket:
 
         ```sh
-        # Env is shared-svcs since the full name is too long be an S3 bucket name
-        AWS_PROFILE=shared-services terraform init -migrate-state \
-            -backend-config="bucket=<shared-services-bucket-name>" \
+        AWS_PROFILE=<environment> terraform init -migrate-state \
+            -backend-config="bucket=<environment-bucket-name>" \
             -backend-config="key=bootstrap/terraform.tfstate" \
             -backend-config="region=us-east-1" \
             -backend-config="use_lockfile=true" \
             -backend-config="encrypt=true"
         ```
 
-    1. After the migration, remove the empty S3 bucket backend in `./infrastructure/bootstrap/providers.tf` for the next run.
-    1. After the migration, delete the local state file (`./infrastructure/bootstrap/terraform.tfstate` and `./infrastructure/bootstrap/terraform.tfstate.backup`)
-    1. After the migration, add the following S3 backend configuration to the shared-services environment in `./infrastructure/environments/shared-services/providers.tf`:
+    1. After the migration, add the following S3 backend configuration to the environment in `./infrastructure/environments/<environment>/providers.tf`:
 
         ```hcl
         terraform {
             backend "s3" {
-                bucket         = "<shared-services-bucket-name>"
-                key            = "shared-svcs/terraform.tfstate"
+                bucket         = "<environment-bucket-name>"
+                key            = "<environment>/terraform.tfstate"
                 use_lockfile   = true
                 region         = var.region
                 encrypt        = true
@@ -260,62 +219,44 @@ All configuration for this sits in ./infrastructure/bootstrap.
         }
         ```
 
-1. For the prod account:
+For any future change of the bootstrap resources after the initial run (when the state is already in an S3 bucket):
 
-    1. In `./infrastructure/bootstrap/providers.tf` ensure that the backend configuration is empty.
+1. Change to the required directory:
 
-    1. Delete the current `.terraform` directory to clear the cache from the previous run:
+    ```sh
+    cd ./infrastructure/bootstrap
+    ```
 
-        ```sh
-        rm -rf .terraform
-        ```
+1. Delete the `.terraform` folder if switching environments or if previously ran `terraform init` with a different provider backend.
 
-    1. Initialize the directory:
+    ```sh
+    rm -rf .terraform
+    ```
 
-        ```sh
-        terraform init -reconfigure
-        ```
+1. Ensure that in `providers.tf` the backend is defined as:
 
-    1. Create the bootstrap resource (an S3 bucket):
+    ```hcl
+    backend "s3" {}
+    ```
 
-        ```sh
-        AWS_PROFILE=prod terraform apply \
-            -var="environment=prod" \
-            -var="org_name=shorts-generator" \
-            -var="aws_region=us-east-1"
-        ```
+1. Initialize the directory (env is dev, prod, or shared-services)
 
-        and make sure to note the bucket name in the output.
+    ```sh
+    AWS_PROFILE=<env> terraform init \
+        -backend-config="bucket=<env-bucket-name>" \
+        -backend-config="key=bootstrap/terraform.tfstate" \
+        -backend-config="region=us-east-1" \
+        -backend-config="use_lockfile=true" \
+        -backend-config="encrypt=true"
+    ```
 
-    1. In `./infrastructure/bootstrap/providers.tf` add an empty S3 bucket backend:
+1. Apply the changed resources (env is dev, prod, or shared-services. for the environment shared-services put shared-svcs as the value of the `environment` variable):
 
-        ```hcl
-        backend "s3" {}
-        ```
-
-    1. Then migrate the state to the S3 bucket:
-
-        ```sh
-        AWS_PROFILE=prod terraform init -migrate-state \
-            -backend-config="bucket=<prod-bucket-name>" \
-            -backend-config="key=bootstrap/terraform.tfstate" \
-            -backend-config="region=us-east-1" \
-            -backend-config="use_lockfile=true" \
-            -backend-config="encrypt=true"
-        ```
-
-    1. After the migration, remove the empty S3 bucket backend in `./infrastructure/bootstrap/providers.tf` for the next run.
-    1. After the migration, delete the local state file (`./infrastructure/bootstrap/terraform.tfstate` and `./infrastructure/bootstrap/terraform.tfstate.backup`)
-    1. After the migration, add the following S3 backend configuration to the dev environment in `./infrastructure/environments/prod/providers.tf`:
-
-        ```hcl
-        terraform {
-            backend "s3" {
-                bucket         = "<prod-bucket-name>"
-                key            = "prod/terraform.tfstate"
-                use_lockfile   = true
-                region         = var.region
-                encrypt        = true
-            }
-        }
-        ```
+    ```sh
+    AWS_PROFILE=<env> terraform apply \
+        -var="environment=<env>" \
+        -var="org_name=shorts-generator" \
+        -var="aws_region=us-east-1" \
+        -var="github_org=yahav2305" \
+        -var="github_repo=shorts-generator"
+    ```
