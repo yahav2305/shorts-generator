@@ -1,0 +1,102 @@
+name: Dev Ephemeral Infrastructure (PR Lifecycle)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'infrastructure/environments/dev/**'
+      - 'infrastructure/modules/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-and-test:
+    name: Deploy & Test Ephemeral Stack (PR-${{ github.event.number }})
+    if: github.event.action != 'closed'
+
+    runs-on: ubuntu-latest
+    environment: dev
+
+    defaults:
+      run:
+        working-directory: infrastructure/environments/dev
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_DEV_CICD_ROLE_ARN }}
+          aws-region: us-east-1
+          mask-aws-account-id: true
+          role-session-name: github-run-id-${{ github.run_id }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Init (Isolated S3 State Key)
+        run: |
+          terraform init \
+            -backend-config="key=ephemeral/pr-${{ github.event.number }}.tfstate"
+
+      - name: Terraform Validation Check
+        run: terraform validate
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve \
+            -var-file=terraform.tfvars \
+            -var="environment=pr-${{ github.event.number }}"
+
+      - name: Run E2E Integration Tests
+        run: |
+          echo "Running E2E tests"
+          # TODO: create E2E tests
+
+  teardown:
+    name: Destroy Ephemeral Stack (PR-${{ github.event.number }})
+    if: github.event.action == 'closed'
+
+    runs-on: ubuntu-latest
+    environment: dev
+
+    defaults:
+      run:
+        working-directory: infrastructure/environments/dev
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_DEV_CICD_ROLE_ARN }}
+          aws-region: us-east-1
+          mask-aws-account-id: true
+          role-session-name: github-run-id-${{ github.run_id }}
+
+      - name: Terraform Init (Target Same PR State Key)
+        run: |
+          terraform init \
+            -backend-config="key=ephemeral/pr-${{ github.event.number }}.tfstate"
+
+      - name: Terraform Destroy
+        run: |
+          terraform destroy -auto-approve \
+            -var-file=terraform.tfvars \
+            -var="environment=pr-${{ github.event.number }}"
