@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "shorts-generator-tfstate-prod-469061454457-us-east-1-an"
-    key            = "prod/terraform.tfstate"
-    use_lockfile   = true
-    region         = "us-east-1"
-    encrypt        = true
+    bucket       = "shorts-generator-tfstate-prod-469061454457-us-east-1-an"
+    key          = "prod/terraform.tfstate"
+    use_lockfile = true
+    region       = "us-east-1"
+    encrypt      = true
   }
 }
 
