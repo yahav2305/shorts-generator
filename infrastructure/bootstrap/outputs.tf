@@ -3,17 +3,7 @@ output "tf_state_bucket_name" {
   value       = aws_s3_bucket.tf_state_bucket.id
 }
 
-output "backend_config_snippet" {
-  description = "Pre-formatted backend configuration block"
-  value       = <<EOF
-terraform {
-  backend "s3" {
-    bucket         = "${aws_s3_bucket.tf_state_bucket.id}"
-    key            = "${var.environment}/terraform.tfstate"
-    use_lockfile   = true
-    region         = "${var.aws_region}"
-    encrypt        = true
-  }
-}
-EOF
+output "cicd_role_arn" {
+  description = "ARN for the CI/CD deployment role"
+  value       = aws_iam_role.cicd_deployer.arn
 }
