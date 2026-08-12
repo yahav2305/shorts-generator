@@ -176,3 +176,8 @@ resource "aws_iam_policy" "cicd_scoped_policy" {
   description = "Scoped deployment permissions for Terraform CI/CD"
   policy      = data.aws_iam_policy_document.cicd_scoped_permissions.json
 }
+
+resource "aws_iam_role_policy_attachment" "cicd_scoped_policy" {
+  role = aws_iam_role.cicd_deployer.name
+  policy_arn = aws_iam_policy.cicd_scoped_policy.arn
+}
