@@ -18,12 +18,22 @@ variable "aws_region" {
   description = "The AWS region resources are deployed in"
 }
 
-variable "github_org" {
+variable "github_org_name" {
   type        = string
-  description = "The Github organization that OIDC will provide access keys to"
+  description = "The Github organization name that OIDC will provide access keys to"
 }
 
-variable "github_repo" {
+variable "github_org_id" {
   type        = string
-  description = "The Github repository in the Github organization that OIDC will provide access keys to"
+  description = "The Github organization ID that OIDC will provide access keys to. Can be searched by `curl -Ss https://api.github.com/repos/yahav2305/shorts-generator | jq .owner.id`"
+}
+
+variable "github_repo_name" {
+  type        = string
+  description = "The Github repository name in the Github organization that OIDC will provide access keys to"
+}
+
+variable "github_repo_id" {
+  type        = string
+  description = "The Github repository ID in the Github organization that OIDC will provide access keys to. Can be searched by `curl -Ss https://api.github.com/repos/yahav2305/shorts-generator | jq .id`"
 }

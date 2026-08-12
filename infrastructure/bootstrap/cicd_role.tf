@@ -1,30 +1,34 @@
 data "aws_iam_policy_document" "cicd_assume_role" {
-  statement {
-    sid     = "AllowEnvironmentDeployments"
-    effect  = "Allow"
-    actions = ["sts:AssumeRoleWithWebIdentity"]
+  dynamic "statement" {
+    for_each = var.environment != "dev" ? [1] : []
 
-    principals {
-      type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
-    }
+    content {
+      sid     = "AllowEnvironmentDeployments"
+      effect  = "Allow"
+      actions = ["sts:AssumeRoleWithWebIdentity"]
 
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:aud"
-      values   = ["sts.amazonaws.com"]
-    }
+      principals {
+        type        = "Federated"
+        identifiers = [aws_iam_openid_connect_provider.github.arn]
+      }
 
-    condition {
-      test     = "StringEquals"
-      variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.github_repo}:environment:${var.environment}"]
-    }
+      condition {
+        test     = "StringEquals"
+        variable = "token.actions.githubusercontent.com:aud"
+        values   = ["sts.amazonaws.com"]
+      }
 
-    condition {
-      test     = contains(["prod", "shared-svcs"], var.environment) ? "StringEquals" : "StringNotEquals"
-      variable = "token.actions.githubusercontent.com:ref"
-      values   = ["refs/heads/main"]
+      condition {
+        test     = "StringEquals"
+        variable = "token.actions.githubusercontent.com:sub"
+        values   = ["repo:${var.github_org_name}@${var.github_org_id}/${var.github_repo_name}@${var.github_repo_id}:environment:${var.environment}"]
+      }
+
+      condition {
+        test     = "StringEquals"
+        variable = "token.actions.githubusercontent.com:ref"
+        values   = ["refs/heads/main"]
+      }
     }
   }
 
@@ -50,7 +54,7 @@ data "aws_iam_policy_document" "cicd_assume_role" {
       condition {
         test     = "StringEquals"
         variable = "token.actions.githubusercontent.com:sub"
-        values   = ["repo:${var.github_org}/${var.github_repo}:pull_request"]
+        values   = ["repo:${var.github_org_name}@${var.github_org_id}/${var.github_repo_name}@${var.github_repo_id}:pull_request"]
       }
     }
   }
@@ -157,18 +161,18 @@ data "aws_iam_policy_document" "cicd_workload_boundary" {
 }
 
 resource "aws_iam_role" "cicd_deployer" {
-  name               = "${var.environment}-cicd-deployer-${var.github_org}-${var.github_repo}"
+  name               = "${var.environment}-cicd-deployer-${var.github_org_name}-${var.github_repo_name}"
   assume_role_policy = data.aws_iam_policy_document.cicd_assume_role.json
 }
 
 resource "aws_iam_policy" "cicd_workload_boundary" {
-  name        = "${var.environment}-cicd-workload-boundary-${var.github_org}-${var.github_repo}"
+  name        = "${var.environment}-cicd-workload-boundary-${var.github_org_name}-${var.github_repo_name}"
   description = "Maximum permissions ceiling for workload roles created by the CI/CD deployer role"
   policy      = data.aws_iam_policy_document.cicd_workload_boundary.json
 }
 
 resource "aws_iam_policy" "cicd_scoped_policy" {
-  name        = "${var.environment}-cicd-policy-${var.github_org}-${var.github_repo}"
+  name        = "${var.environment}-cicd-policy-${var.github_org_name}-${var.github_repo_name}"
   description = "Scoped deployment permissions for Terraform CI/CD"
   policy      = data.aws_iam_policy_document.cicd_scoped_permissions.json
 }
