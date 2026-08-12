@@ -180,8 +180,10 @@ All configuration for the bootstrapping sits in ./infrastructure/bootstrap.
             -var="environment=<environment>" \
             -var="org_name=shorts-generator" \
             -var="aws_region=us-east-1" \
-            -var="github_org=yahav2305" \
-            -var="github_repo=shorts-generator"
+            -var="github_org_name=yahav2305" \
+            -var="github_org_id=15077067" \
+            -var="github_repo_name=shorts-generator" \
+            -var="github_repo_id=1316095102"
         ```
 
         and make sure to note the output.
@@ -254,9 +256,11 @@ For any future change of the bootstrap resources after the initial run (when the
 
     ```sh
     AWS_PROFILE=<env> terraform apply \
-        -var="environment=<env>" \
+        -var="environment=<environment>" \
         -var="org_name=shorts-generator" \
         -var="aws_region=us-east-1" \
-        -var="github_org=yahav2305" \
-        -var="github_repo=shorts-generator"
+        -var="github_org_name=yahav2305" \
+        -var="github_org_id=15077067" \
+        -var="github_repo_name=shorts-generator" \
+        -var="github_repo_id=1316095102"
     ```
