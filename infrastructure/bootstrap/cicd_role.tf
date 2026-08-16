@@ -21,7 +21,10 @@ data "aws_iam_policy_document" "cicd_assume_role" {
       condition {
         test     = "StringEquals"
         variable = "token.actions.githubusercontent.com:sub"
-        values   = ["repo:${var.github_org_name}@${var.github_org_id}/${var.github_repo_name}@${var.github_repo_id}:environment:${var.environment}"]
+        values   = [
+          "repo:${var.github_org_name}@${var.github_org_id}/${var.github_repo_name}@${var.github_repo_id}:environment:${var.environment}",
+          "repo:${var.github_org_name}@${var.github_org_id}/${var.github_repo_name}@${var.github_repo_id}:ref:refs/heads/main"
+        ]
       }
 
       condition {
