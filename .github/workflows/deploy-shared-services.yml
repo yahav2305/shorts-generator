@@ -70,7 +70,7 @@ jobs:
   apply:
     name: Terraform Apply (Shared Services)
     runs-on: ubuntu-24.04
-    environment: shared-services
+    environment: shared-svcs
 
     needs: [plan]
 
